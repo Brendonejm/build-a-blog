@@ -3,48 +3,57 @@ from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 app.config['DEBUG'] = True
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://get-it-done:beproductive@localhost:8889/get-it-done'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://build-a-blog:passwordlol@localhost:8889/build-a-blog'
 app.config['SQLALCHEMY_ECHO'] = True
 db = SQLAlchemy(app)
 
-
-class Task(db.Model):
-
+class Blog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120))
-    completed = db.Column(db.Boolean)
+    title = db.Column(db.String(120))
+    body = db.Column(db.Text)
 
-    def __init__(self, name):
-        self.name = name
-        self.completed = False
+    def __init__(self, title, body):
+        self.title = title
+        self.body = body
 
-
-@app.route('/', methods=['POST', 'GET'])
+@app.route('/')
 def index():
+    return redirect('/blog')
 
+@app.route('/blog')
+def blog():
+    blog_id = request.args.get('id')
+
+    if blog_id == None:
+        posts = Blog.query.all()
+        return render_template('blog.html', posts=posts, title='Build-a-blog')
+    else:
+        post = Blog.query.get(blog_id)
+        return render_template('entry.html', post=post, title='Blog Entry')
+
+@app.route('/newpost', methods=['POST', 'GET'])
+def new_post():
     if request.method == 'POST':
-        task_name = request.form['task']
-        new_task = Task(task_name)
-        db.session.add(new_task)
-        db.session.commit()
+        blog_title = request.form['blog-title']
+        blog_body = request.form['blog-entry']
+        title_error = ''
+        body_error = ''
 
-    tasks = Task.query.filter_by(completed=False).all()
-    completed_tasks = Task.query.filter_by(completed=True).all()
-    return render_template('todos.html',title="Get It Done!", 
-        tasks=tasks, completed_tasks=completed_tasks)
+        if not blog_title:
+            title_error = "Please enter a blog title"
+        if not blog_body:
+            body_error = "Please enter a blog entry"
 
+        if not body_error and not title_error:
+            new_entry = Blog(blog_title, blog_body)     
+            db.session.add(new_entry)
+            db.session.commit()        
+            return redirect('/blog?id={}'.format(new_entry.id)) 
+        else:
+            return render_template('newpost.html', title='New Entry', title_error=title_error, body_error=body_error, 
+                blog_title=blog_title, blog_body=blog_body)
+    
+    return render_template('newpost.html', title='New Entry')
 
-@app.route('/delete-task', methods=['POST'])
-def delete_task():
-
-    task_id = int(request.form['task-id'])
-    task = Task.query.get(task_id)
-    task.completed = True
-    db.session.add(task)
-    db.session.commit()
-
-    return redirect('/')
-
-
-if __name__ == '__main__':
+if  __name__ == "__main__":
     app.run()
